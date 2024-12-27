@@ -112,6 +112,11 @@ ViewGabarits GetViewGabarit(IViewPtr iView, gabaritType gabarit)
 	return result;
 }
 
+void doNothing()
+{
+	/////
+}
+
 void ViewSettings(IViewPtr iView)
 {
 	CString view_name_cstr = _T("Созданный вид");  // Строка в формате CString
