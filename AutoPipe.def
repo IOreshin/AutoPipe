@@ -1,0 +1,9 @@
+﻿; AutoPipe.def: объявляет параметры модуля для библиотеки DLL.
+
+LIBRARY
+
+EXPORTS
+    ; Сюда можно направлять явные операции экспорта
+ LIBRARYID               @1
+ LIBRARYENTRY            @2
+ CALLBACKPOINT           @3
