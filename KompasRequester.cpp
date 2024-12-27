@@ -10,6 +10,7 @@
 #include <utility>
 #include <array>
 #include "PipelineSolver.h"
+#include <cmath>
 
 
 using namespace std;
@@ -21,6 +22,118 @@ extern CAutoPipeApp theApp;
 
 
 array<double, 3> start_point_coordinates = {NAN, NAN, NAN};
+IBody7Ptr selectedBody = nullptr;
+
+void getBodyOwner(IFeature7* owner)
+{
+	VARIANT ResultBodies;
+	VariantInit(&ResultBodies);
+
+	owner->get_ResultBodies(&ResultBodies);
+	if (ResultBodies.vt == VT_DISPATCH)
+	{
+		IBody7Ptr body7 = ResultBodies.pdispVal;
+		if (body7)
+		{
+			selectedBody = body7;
+		}
+	}
+}
+
+double roundToThreeDecimalPlaces(double value) {
+	return round(value * 1000.0) / 1000.0;
+}
+
+void getEdgeCenter(IEdgePtr iEdge)
+{
+	IMathCurve3DPtr iMathCurve;
+	iEdge->get_MathCurve(&iMathCurve);
+	double x, y, z;
+	iMathCurve->GetCentre(&x, &y, &z);
+	x = roundToThreeDecimalPlaces(x);
+	y = roundToThreeDecimalPlaces(y);
+	z = roundToThreeDecimalPlaces(z);
+	start_point_coordinates = { x, y, z };
+}
+
+void getSelectedObjectParams(IFacePtr iFace = nullptr, IEdgePtr iEdge = nullptr)
+{
+	VARIANT_BOOL result;
+	if (iFace!=nullptr)
+	{
+		try
+		{
+			IFeature7* owner = nullptr;
+			iFace->get_Owner(&owner);
+			if (owner)
+			{
+				getBodyOwner(owner);
+				VARIANT connectedFaces;
+				VariantInit(&connectedFaces);
+				iFace->get_ConnectedFaces(&connectedFaces);
+				if ((connectedFaces.vt & VT_ARRAY) && (connectedFaces.vt & VT_DISPATCH))
+				{
+					SAFEARRAY* faces = connectedFaces.parray;
+					LONG lBound, uBound;
+					SafeArrayGetLBound(faces, 1, &lBound);
+					SafeArrayGetUBound(faces, 1, &uBound);
+					for (LONG i = lBound; i <= uBound; ++i)
+					{
+						IDispatch* iFaceDisp = nullptr;
+						SafeArrayGetElement(faces, &i, &iFaceDisp);
+						if (iFaceDisp)
+						{
+							IFacePtr iFaceTorec = iFaceDisp;
+							VARIANT_BOOL result;
+							iFaceTorec->get_IsPlanar(&result);
+							if (result == TRUE)
+							{
+								VARIANT limitingEdges;
+								VariantInit(&limitingEdges);
+								iFaceTorec->get_LimitingEdges(&limitingEdges);
+								if ((limitingEdges.vt & VT_ARRAY) && (limitingEdges.vt & VT_DISPATCH))
+								{
+
+									SAFEARRAY* edges = limitingEdges.parray;
+									LONG edgeLBound, edgeUBound;
+									SafeArrayGetLBound(edges, 1, &edgeLBound);
+									SafeArrayGetUBound(edges, 1, &edgeUBound);
+									for (LONG i = edgeLBound; i <= edgeUBound; ++i)
+									{
+										IDispatch* iEdgeDisp = nullptr;
+										SafeArrayGetElement(edges, &i, &iEdgeDisp);
+										if (iEdgeDisp)
+										{
+											IEdgePtr iEdge = iEdgeDisp;
+											getEdgeCenter(iEdge);
+											return;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		catch (...)
+		{
+			pKompas_5->ksMessage(_T("Ошибка FACE"));
+		}
+	}
+	else
+	{
+		IFeature7* owner = nullptr;
+		iEdge->get_Owner(&owner);
+		if (owner)
+		{
+			getBodyOwner(owner);
+			getEdgeCenter(iEdge);
+			return;
+		}
+	}
+	return;
+}
 
 int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 {
@@ -34,21 +147,39 @@ int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 		if (pEntity)
 		{
 			pCollection = info->GetEntityCollection();
-			if (pEntity->type == o3d_vertex)
+			if (pEntity->type == o3d_face || pEntity->type == o3d_edge)
 			{
 				try
 				{
-					//ksVertexDefinitionPtr ksVertex = pCollection->SetByIndex(pEntity, 0);
-					ksVertexDefinitionPtr ksVertex = pEntity->GetDefinition();
-					double x, y, z;
-					ksVertex->GetPoint(&x, &y, &z);
-					start_point_coordinates = { x, y, z };
-					res = 1;
+					if (pEntity->type == o3d_face)
+					{
+						res = 1;
+						ksFaceDefinitionPtr ksFace = pEntity->GetDefinition();
+						LPUNKNOWN iFace = pKompas_5->TransferInterface(ksFace, ksAPITypeEnum::ksAPI7Dual, 0);
+						if (iFace)
+						{
+							getSelectedObjectParams(iFace);
+						}
+
+					}
+					else if (pEntity->type == o3d_edge)
+					{
+						res = 1;
+						ksEdgeDefinitionPtr ksEdge = pEntity->GetDefinition();
+						LPUNKNOWN iEdge = pKompas_5->TransferInterface(ksEdge, ksAPITypeEnum::ksAPI7Dual, 0);
+						if (iEdge)
+						{
+							getSelectedObjectParams(nullptr, iEdge);
+						}
+					}
+
+					else res = 0;
 				}
 
 				catch (...)
 				{
 					pKompas_5->ksMessage(_T("Ошибка"));
+					res = 0;
 				}
 			}
 		}
@@ -60,6 +191,17 @@ int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 		return 0;
 	}
 	return res;
+}
+
+
+
+void startCreatingDrawing()
+{
+	IKompasDocumentPtr doc;
+	pKompas_7->get_ActiveDocument(&doc);
+	BSTR pathName;
+	doc->get_PathName(&pathName);
+	CreateBodyDrawing(selectedBody, pathName);
 }
 
 void getRequestInfo()
@@ -75,16 +217,24 @@ void getRequestInfo()
 	pRequestInfo->SetCallBackEx(_T("CALLBACKPOINT"), PtrToLong(theApp.m_hInstance), 0);
 
 	pDocument3D->UserGetPlacementAndEntity(1);
-	if (!isnan(start_point_coordinates[0]))
+
+	if (selectedBody != nullptr)
 	{
-		PipelineSolver solver(false, start_point_coordinates);
-		solver.getPipelineSolution();
+		if (!isnan(start_point_coordinates[0]))
+		{
+			PipelineSolver solver(false, start_point_coordinates);
+			solver.getPipelineSolution();
+		}
+		startCreatingDrawing();
+
 		start_point_coordinates = { NAN, NAN, NAN };
+		selectedBody = nullptr;
 	}
 	else
 	{
-		pKompas_5->ksMessage(_T("Выделите точку"));
+		pKompas_5->ksMessage(_T("Укажите объект"));
 	}
+
 }
 
 

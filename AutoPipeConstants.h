@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 
 enum gabaritType {
 	GABARIT_SIZE = 1,
@@ -10,4 +11,9 @@ struct ViewGabarits
 	double x_gab = NAN, y_gab = NAN; //размеры габаритного прямоугольника
 	double x_bot = NAN, y_bot = NAN; //координаты нижней левой точки
 	double x_top = NAN, y_top = NAN; //координаты верхней правой точки
+};
+
+enum objectType {
+	FACE = 1,
+	EDGE = 2
 };

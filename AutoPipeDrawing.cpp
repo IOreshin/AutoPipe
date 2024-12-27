@@ -112,10 +112,6 @@ ViewGabarits GetViewGabarit(IViewPtr iView, gabaritType gabarit)
 	return result;
 }
 
-void doNothing()
-{
-	/////
-}
 
 void ViewSettings(IViewPtr iView)
 {
