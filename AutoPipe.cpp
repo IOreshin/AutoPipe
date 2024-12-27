@@ -139,9 +139,7 @@ void WINAPI LIBRARYENTRY(unsigned int comm)
         {
             switch (comm)
             {
-            case IDM_OBJECT: SelectedBodyDrawing(); break;
-            case IDM_DOTS: getPipelineSolution(); break;
-            case IDM_REQUEST: getRequestInfo(); break;
+            case IDM_PIPEDRAWING: getRequestInfo(); break;
             }
         }
         catch (...)

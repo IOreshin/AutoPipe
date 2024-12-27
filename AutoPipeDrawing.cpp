@@ -1,4 +1,5 @@
-﻿#include "pch.h"
+﻿#pragma once
+#include "pch.h"
 #include "AutoPipeDrawing.h"
 #include "AutoPipe.h"
 #include "KompasUtility.h"
@@ -8,6 +9,10 @@
 #include <vector>
 #include <utility>
 #include "AutoPipeConstants.h"
+#include <sstream>
+#include <string>
+#include <atlbase.h>
+#include <iomanip>
 
 using namespace std;
 
@@ -35,7 +40,7 @@ void ChangeLayoutSheet(IKompasDocumentPtr doc)
 }
 
 //создание вида в чертеже
-IViewPtr CreateView(IKompasDocumentPtr doc, IBody7Ptr Body7, BSTR pathName)
+IViewPtr CreateTubeView(IKompasDocumentPtr doc, IBody7Ptr Body7, BSTR pathName)
 {
 	IKompasDocument2DPtr doc2D(doc);
 	IKompasDocument2D1Ptr doc2D1(doc2D);
@@ -115,7 +120,7 @@ ViewGabarits GetViewGabarit(IViewPtr iView, gabaritType gabarit)
 
 void ViewSettings(IViewPtr iView)
 {
-	CString view_name_cstr = _T("Созданный вид");  // Строка в формате CString
+	CString view_name_cstr = _T("Главный изометрический вид");  // Строка в формате CString
 	BSTR view_name = view_name_cstr.AllocSysString();
 	iView->put_Name(view_name);
 	IViewDesignationPtr iViewDesignation(iView);
@@ -155,9 +160,86 @@ void ViewSettings(IViewPtr iView)
 	iView->Update();
 }
 
+double roundToTwoDecimalPlaces(double value) {
+	return round(value * 10.0) / 10.0;
+}
+
+void CreateBendTable(vector <array<double, 3>> pipelineTrajectory, IKompasDocumentPtr doc)
+{
+	IKompasDocument2DPtr doc2D(doc);
+	IKompasDocument2D1Ptr doc2D1(doc2D);
+	IViewsAndLayersManagerPtr iViewsMng;
+
+	doc2D->get_ViewsAndLayersManager(&iViewsMng);
+	IViewsPtr iViews;
+	iViewsMng->get_Views(&iViews);
+
+	IViewPtr iView;
+	iViews->raw_Add(vt_Normal, &iView);
+
+	CString view_name_cstr = _T("Таблица гибов");  // Строка в формате CString
+	BSTR view_name = view_name_cstr.AllocSysString();
+	iView->put_Name(view_name);
+
+	iView->put_X(415);
+	iView->put_Y(292);
+
+	iView->Update();
+
+	ISymbols2DContainerPtr iSymContainer(iView);
+	IDrawingTablesPtr iDrwTables;
+	iSymContainer->get_DrawingTables(&iDrwTables);
+	IDrawingTablePtr iDrwTable;
+
+	long rowsCount = pipelineTrajectory.size()+1;
+	long colsCount = 3;
+	long rowHeight = 8;
+	long colWidth = 25;
+
+	iDrwTables->raw_Add(rowsCount, colsCount, rowHeight, colWidth, ksTableTileLayoutEnum::ksTTLNotCreate, &iDrwTable);
 
 
-void CreateBodyDrawing(IBody7Ptr Body7, BSTR pathName)
+	iDrwTable->put_X(double( - 3 * colWidth));
+	iDrwTable->Update();
+
+	ITablePtr iTable(iDrwTable);
+	BSTR titles[] = { L"X", L"Y", L"Z" };
+	//СТРОКИ
+	for (long i = 0; i < rowsCount; ++i)
+	{
+		//СТОЛБЦЫ
+		for (long n = 0; n < colsCount; ++n)
+		{
+			ITableCellPtr iCell;
+			iTable->get_Cell(i, n, &iCell);
+			IKompasAPIObjectPtr iKomObj;
+			iCell->get_Text(&iKomObj);
+			ITextPtr iText = iKomObj;
+			if (i == 0)
+			{
+				iText->put_Str(titles[n]);
+			}
+			else
+			{
+				array<double, 3> coords = pipelineTrajectory[i - 1];
+				double coord = coords[n];
+
+				// Округление до 1 знака после запятой
+				std::wostringstream stream;
+				stream << std::fixed << std::setprecision(1) << coord;
+				// Преобразование в BSTR
+				CComBSTR bstrCoord(stream.str().c_str());
+				iText->put_Str(bstrCoord);
+			}
+
+		}
+	}
+	iDrwTable->Update();
+
+}
+
+
+void CreateBodyDrawing(IBody7Ptr Body7, BSTR pathName, vector <array<double, 3>> pipelineTrajectory)
 {
 	HRESULT hr;
 	IDocumentsPtr iDocuments;
@@ -174,71 +256,8 @@ void CreateBodyDrawing(IBody7Ptr Body7, BSTR pathName)
 	}
 
 	ChangeLayoutSheet(doc);
-	IViewPtr iView = CreateView(doc, Body7, pathName);
+	IViewPtr iView = CreateTubeView(doc, Body7, pathName);
 	ViewSettings(iView);
-
+	CreateBendTable(pipelineTrajectory, doc);
 }
 
-//основная функция по получению тела из сборки
-void SelectedBodyDrawing()
-{
-	HRESULT hr;
-	//определение наличия документа
-	IKompasDocumentPtr doc = nullptr;
-	pKompas_7->get_ActiveDocument(&doc);
-	if (!doc)
-	{
-		pKompas_5->ksMessage(_T("Нет активного документа"));
-		return;
-	}
-
-	//определение типа документа
-	DocumentTypeEnum doc_type;
-	doc->get_DocumentType(&doc_type);
-	if (doc_type != 5)
-	{
-		pKompas_5->ksMessage(_T("Документ не является сборкой"));
-		return;
-	}
-	BSTR pathName;
-	doc->get_PathName(&pathName);
-
-	IKompasDocument3DPtr doc3D (doc);
-	
-	//получение выделенных объектов
-	ISelectionManagerPtr selectionManager;
-	doc3D->get_SelectionManager(&selectionManager);
-	VARIANT selectedObjects;
-	VariantInit(&selectedObjects);
-	selectionManager->get_SelectedObjects(&selectedObjects);
-	selectionManager->UnselectAll();
-
-	if (selectedObjects.vt == VT_DISPATCH)
-	{
-		IModelObjectPtr modelObject = selectedObjects.pdispVal;
-		if (modelObject)
-		{
-			IFeature7* owner = nullptr;
-			hr = modelObject->get_Owner(&owner);
-			if (owner)
-			{
-				VARIANT ResultBodies;
-				VariantInit(&ResultBodies);
-
-				owner->get_ResultBodies(&ResultBodies);
-				if (ResultBodies.vt == VT_DISPATCH)
-				{
-					IBody7Ptr body7 = ResultBodies.pdispVal;
-					if (body7)
-					{
-						CreateBodyDrawing(body7, pathName);
-					}
-				}
-			}
-		}
-	}
-	else
-	{
-		pKompas_5->ksMessage(_T("Ошибка выделения объекта"));
-	}
-}

@@ -172,14 +172,13 @@ int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 							getSelectedObjectParams(nullptr, iEdge);
 						}
 					}
-
-					else res = 0;
+					else res = -1;
 				}
 
 				catch (...)
 				{
 					pKompas_5->ksMessage(_T("Ошибка"));
-					res = 0;
+					res = -1;
 				}
 			}
 		}
@@ -188,20 +187,18 @@ int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 	}
 	catch (...)
 	{
-		return 0;
+		return -1;
 	}
 	return res;
 }
 
-
-
-void startCreatingDrawing()
+void startCreatingDrawing(vector <array<double, 3>> pipelineTrajectory)
 {
 	IKompasDocumentPtr doc;
 	pKompas_7->get_ActiveDocument(&doc);
 	BSTR pathName;
 	doc->get_PathName(&pathName);
-	CreateBodyDrawing(selectedBody, pathName);
+	CreateBodyDrawing(selectedBody, pathName, pipelineTrajectory);
 }
 
 void getRequestInfo()
@@ -223,9 +220,13 @@ void getRequestInfo()
 		if (!isnan(start_point_coordinates[0]))
 		{
 			PipelineSolver solver(false, start_point_coordinates);
-			solver.getPipelineSolution();
+			vector <array<double, 3>> pipilineTrajectory = solver.getPipelineTrajectory();
+			startCreatingDrawing(pipilineTrajectory);
 		}
-		startCreatingDrawing();
+		else
+		{
+			pKompas_5->ksMessage(_T("Ошибка получения траектории"));
+		}
 
 		start_point_coordinates = { NAN, NAN, NAN };
 		selectedBody = nullptr;

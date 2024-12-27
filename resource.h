@@ -5,9 +5,8 @@
 #define IDR_API7                        102
 #define IDR_MENU                        1000
 #define IDR_AUTO_LIB                    1001
-#define IDM_OBJECT                      32779
-#define IDM_DOTS                        32780
-#define IDM_REQUEST                     32782
+#define IDM_PIPEDRAWING                 32779
+
 
 // Next default values for new objects
 // 
