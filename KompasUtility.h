@@ -6,3 +6,5 @@ using namespace std;
 string BSTRToString(BSTR bstr);
 
 BSTR CStringToBSTR(const std::string& str);
+
+double roundToThreeDecimalPlaces(double value);

@@ -40,9 +40,7 @@ void getBodyOwner(IFeature7* owner)
 	}
 }
 
-double roundToThreeDecimalPlaces(double value) {
-	return round(value * 1000.0) / 1000.0;
-}
+
 
 void getEdgeCenter(IEdgePtr iEdge)
 {
@@ -219,7 +217,7 @@ void getRequestInfo()
 	{
 		if (!isnan(start_point_coordinates[0]))
 		{
-			PipelineSolver solver(false, start_point_coordinates);
+			PipelineSolver solver(start_point_coordinates);
 			vector <array<double, 3>> pipilineTrajectory = solver.getPipelineTrajectory();
 			startCreatingDrawing(pipilineTrajectory);
 		}

@@ -19,78 +19,25 @@ using namespace std;
 // Внешние переменные
 extern KompasObjectPtr pKompas_5;		// Указатель на интерфейс КОМПАС в API5
 extern IApplicationPtr pKompas_7;		// Указатель на интерфейс КОМПАС в API7
-extern CAutoPipeApp theApp;
 
-PipelineSolver::PipelineSolver(bool useAutomaticStart, array<double, 3> userStartPoint)
+
+
+PipelineSolver::PipelineSolver(array<double, 3> userStartPoint)
 {
-    if (useAutomaticStart) {
-        // Если нужно автоматически определить стартовую точку
-        start_point = defineFirstPoint();
-    }
-    else {
-        // Если точка передается вручную
-        start_point = userStartPoint;
-    }
-
+    start_point = userStartPoint;
     if (!isnan(start_point[0]))
     {
-        pipiline_dots.push_back(start_point);  // Добавляем первую точку в массив
+        pipeline_dots.push_back(start_point);  // Добавляем первую точку в массив
         getLinesCoords();  // Получаем координаты линий
         findPipeline();  // Находим траекторию
+        getRelativePointCoordinates(); // Заполняем массив смещенных координат точек
     }
-}
-
-void PipelineSolver::getPipelineSolution()
-{
-    printPipelineDots();  // Печатаем результат
 }
 
 // Метод для получения массива точек
 vector <array<double, 3>> PipelineSolver::getPipelineTrajectory()
 {
-    return pipiline_dots;
-}
-
-// Функция определения координаты первой точки. Используется выделенный объект в документе
-array<double, 3> PipelineSolver::defineFirstPoint()
-{
-    IKompasDocumentPtr doc;
-    pKompas_7->get_ActiveDocument(&doc);
-    IKompasDocument3DPtr doc3D(doc);
-    ISelectionManagerPtr iSelectMng;
-    doc3D->get_SelectionManager(&iSelectMng);
-    VARIANT selectedObjects;
-    VariantInit(&selectedObjects);
-    iSelectMng->get_SelectedObjects(&selectedObjects);
-    iSelectMng->UnselectAll();
-
-    if (selectedObjects.vt != VT_DISPATCH) {
-        pKompas_5->ksMessage(_T("Ошибка выделения объекта"));
-        return {NAN,NAN,NAN};
-    }
-
-    IDispatchPtr iVertexDisp = selectedObjects.pdispVal;
-    IVertexPtr iVertex;
-    iVertexDisp->QueryInterface(__uuidof(IVertexPtr), (void**)&iVertex);
-    if (iVertex)
-    {
-        double x, y, z;
-        VARIANT_BOOL result;
-        
-        auto vertex_coords = iVertex->raw_GetPoint(&x, &y, &z, &result);
-        /*if (result != VARIANT_TRUE)
-        {
-            pKompas_5->ksMessage(_T("Ошибка получения координаты точки"));
-            return { NAN,NAN,NAN };
-        }*/
-        return { x, y, z, };
-    }
-    else
-    {
-        pKompas_5->ksMessage(_T("Неверный тип выделенного объекта"));
-        return { NAN, NAN, NAN };
-    }
-    return { NAN,NAN,NAN };
+    return relativeCoordinates;
 }
 
 // Функция получения координат всех прямых IEdge в документе
@@ -129,6 +76,12 @@ void PipelineSolver::getLinesCoords()
             }
             double x1, y1, z1, x2, y2, z2;
             curve3D->GetGabarit(&x1, &y1, &z1, &x2, &y2, &z2);
+            x1 = roundToThreeDecimalPlaces(x1);
+            y1 = roundToThreeDecimalPlaces(y1);
+            z1 = roundToThreeDecimalPlaces(z1);
+            x2 = roundToThreeDecimalPlaces(x2);
+            y2 = roundToThreeDecimalPlaces(y2);
+            z2 = roundToThreeDecimalPlaces(z2);
             lines_coords.push_back({ x1, y1, z1, x2, y2, z2 });
         }
     }
@@ -147,7 +100,7 @@ void PipelineSolver::findPipeline()
             auto second_point = array<double, 3>{ (*it)[3], (*it)[4], (*it)[5] };
             if (second_point == start_point)
             {
-                pipiline_dots.push_back(first_point);
+                pipeline_dots.push_back(first_point);
                 start_point = first_point;
                 lines_coords.erase(it);
                 found = true;
@@ -155,7 +108,7 @@ void PipelineSolver::findPipeline()
             }
             else if (first_point == start_point)
             {
-                pipiline_dots.push_back(second_point);
+                pipeline_dots.push_back(second_point);
                 start_point = second_point;
                 lines_coords.erase(it);
                 found = true;
@@ -165,17 +118,23 @@ void PipelineSolver::findPipeline()
     }
 }
 
-// Метод для вывода точек
-void PipelineSolver::printPipelineDots()
+//функция определения относителеного смещения координатных точек
+void PipelineSolver::getRelativePointCoordinates()
 {
-    for (const auto& dot : pipiline_dots)
+    for (size_t i = 0; i < pipeline_dots.size(); ++i)
     {
-        if (dot[0] != NAN)
+        if (i == 0)
         {
-            CString message;
-            message.Format(_T("X: %f, Y: %f, Z: %f"), dot[0], dot[1], dot[2]);
-            _bstr_t messageBSTR = _bstr_t(message);
-            pKompas_5->ksMessage(messageBSTR);
+            relativeCoordinates.push_back({ 0,0,0 });
+        }
+        else
+        {
+            array <double, 3> point_movement;
+            for (int n = 0; n < 3; ++n)
+            {
+                point_movement[n] = pipeline_dots[i][n] - pipeline_dots[i - 1][n];
+            }
+            relativeCoordinates.push_back(point_movement);
         }
     }
 }

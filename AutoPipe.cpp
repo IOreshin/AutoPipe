@@ -120,12 +120,6 @@ unsigned int WINAPI LIBRARYID()
     return IDR_MENU;
 }
 
-void getPipelineSolution()
-{
-    PipelineSolver solver;
-    solver.getPipelineSolution();
-}
-
 //-------------------------------------------------------------------------------
 // Головная функция библиотеки
 // ---

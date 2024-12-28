@@ -22,3 +22,7 @@ BSTR CStringToBSTR(const CString& cstr)
 	BSTR bstr = SysAllocString(cstr.GetString());  // Получаем строку из CString
 	return bstr;
 }
+
+double roundToThreeDecimalPlaces(double value) {
+	return round(value * 1000.0) / 1000.0;
+}
