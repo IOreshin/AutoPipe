@@ -1,5 +1,5 @@
 #pragma once 
-
+#include <comutil.h>  // Для работы с BSTR
 #include <vector>
 #include <array>
 using namespace std;
@@ -13,6 +13,7 @@ public:
 private:
     array<double, 3> start_point;  // Переменная для первой точки
     vector<array<double, 3>> pipeline_dots;  // Массив точек
+    vector<wstring> macro_objects_names; // Массив с именами объектов макро
     array<double, 3> zero_point;
     vector<array<double, 3>> zero_dots_coords;  // Массив с учетом обнуления
     vector<array<double, 6>> lines_coords;  // Массив координат линий
@@ -21,6 +22,7 @@ private:
     vector < array<double, 3>> bendParams;
     vector <array<double, 8>> bendInfo;
 
+    void getMacroObjectsNames();
     bool arePointsEqual(const array<double, 3>& p1, const array<double, 3>& p2, double epsilon);
     void getLinesCoords();  // Метод для получения координат всех линий
     void findPipeline();  // Рекурсивная функция для нахождения решения

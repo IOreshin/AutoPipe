@@ -36,9 +36,10 @@ class PipelineSolver(KompasAPI):
                 iEntity = iEntityCollection.GetByIndex(i)
                 iEntityDefinition = iEntity.GetDefinition()
                 if iEntityDefinition.IsStraight() is True:
+                    print(iEntityDefinition.GetOwnerEntity().name)
                     curve3D = iEntityDefinition.GetCurve3D()
                     iLineSeg = curve3D.GetCurveParam()
-                    print(iLineSeg.GetFirstPoint())
+                    
                     
 
 
@@ -60,6 +61,25 @@ class PipelineSolver(KompasAPI):
                     self.firts_point = second_point
                     self.find_pipeline()
 
-                
-
 PipelineSolver()
+
+
+
+class MacroFinder(KompasAPI):
+    def __init__(self):
+        super().__init__()
+        self.getMacroObjects()
+
+    def getMacroObjects(self):
+        macro_object_names = []
+        doc = self.app.ActiveDocument
+        doc3D = self.module.IKompasDocument3D(doc)
+        part = doc3D.TopPart
+        iModelContainer = self.module.IModelContainer(part)
+        iMacroObjects = iModelContainer.MacroObjects3D
+        for i in range(iMacroObjects.Count):
+            MacroObject = iMacroObjects.MacroObject3D(i)
+            macro_objects = MacroObject.Objects
+            for macro_object in macro_objects:
+                macro_object_names.append(macro_object.Name)
+

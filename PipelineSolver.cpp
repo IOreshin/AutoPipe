@@ -15,6 +15,7 @@
 #include "PipelineSolver.h"
 #include <cmath>
 #include <sstream>
+#include <algorithm>
 
 #ifndef M_PI
     #define M_PI 3.1415926535  // Определение M_PI, если она не определена
@@ -39,13 +40,98 @@ PipelineSolver::PipelineSolver(array<double, 3> userStartPoint)
     if (!isnan(start_point[0]))
     {
         pipeline_dots.push_back(start_point);  // Добавляем первую точку в массив
-        getLinesCoords();  // Получаем координаты линий
-        findPipeline();  // Находим траекторию
-        getRelativePointCoordinates(); // Заполняем массив смещенных координат точек
-        getZeroDotsCoords();
-        calculateBendParams();
-        formBendInformation();
+        getMacroObjectsNames();
+        if (!macro_objects_names.empty())
+        {
+            getLinesCoords();  // Получаем координаты линий
+            findPipeline();  // Находим траекторию
+            getRelativePointCoordinates(); // Заполняем массив смещенных координат точек
+            getZeroDotsCoords();
+            calculateBendParams();
+            formBendInformation();
+        }
     }
+}
+
+void PipelineSolver::getMacroObjectsNames()
+{
+    IKompasDocumentPtr doc;
+    pKompas_7->get_ActiveDocument(&doc);
+    IKompasDocument3DPtr doc3D(doc);
+    IPart7Ptr iPart;
+    doc3D->get_TopPart(&iPart);
+    IModelContainerPtr iModelContainer(iPart);
+    IMacroObjects3DPtr iMacroObjects;
+    iModelContainer->get_MacroObjects3D(&iMacroObjects);
+    long macroCount;
+    iMacroObjects->get_Count(&macroCount);
+    if (macroCount != 0)
+    {
+        for (size_t i = 0; i < macroCount; i++)
+        {
+            VARIANT index;
+            VariantInit(&index);
+            index.vt = VT_I4;
+            index.lVal = i;
+            IMacroObject3DPtr iMacroObject;
+            iMacroObjects->get_MacroObject3D(index, &iMacroObject);
+
+            VARIANT macroObjects;
+            VariantInit(&macroObjects);
+            iMacroObject->get_Objects(&macroObjects);
+            if (macroObjects.vt == VT_DISPATCH)
+            {
+                IDispatch* pObject = V_DISPATCH(&macroObjects);
+                IUserObject3DPtr iUserObj;
+                pObject->QueryInterface(__uuidof(IUserObject3D), (void**)&iUserObj);
+                if (iUserObj != nullptr)
+                {
+                    BSTR objName;
+                    iUserObj->get_Name(&objName);
+                    wstring objName_w(objName, SysStringLen(objName));
+                    auto it = find(macro_objects_names.begin(), macro_objects_names.end(),
+                        objName_w);
+                    if (it == macro_objects_names.end())
+                    {
+                        macro_objects_names.push_back(objName_w);
+                    }
+                }
+            }
+            if (macroObjects.vt & VT_DISPATCH && macroObjects.vt & VT_ARRAY)
+            {
+                SAFEARRAY* pArray = V_ARRAY(&macroObjects);
+                LONG lBound, uBound;
+                SafeArrayGetLBound(pArray, 1, &lBound);
+                SafeArrayGetUBound(pArray, 1, &uBound);
+
+                for (LONG i = lBound; i <= uBound; ++i)
+                {
+                    IDispatch* pObject = nullptr;
+                    SafeArrayGetElement(pArray, &i, &pObject);
+                    if (pObject != nullptr)
+                    {
+                        IUserObject3DPtr iUserObj;
+                        pObject->QueryInterface(__uuidof(IUserObject3D), (void**)&iUserObj);
+                        if (iUserObj != nullptr)
+                        {
+                            BSTR objName;
+                            iUserObj->get_Name(&objName);
+                            wstring objName_w(objName, SysStringLen(objName));
+                            auto it = find(macro_objects_names.begin(), macro_objects_names.end(),
+                                objName_w);
+                            if (it == macro_objects_names.end())
+                            {
+                                macro_objects_names.push_back(objName_w);
+                            }
+                        }
+                    }
+                }
+            }
+            VariantClear(&macroObjects);
+            VariantClear(&index);
+        }
+    }
+
 }
 
 // Метод для получения массива точек
@@ -71,37 +157,37 @@ void PipelineSolver::getLinesCoords()
         ksEntityPtr entity = entityCollection->GetByIndex(i);
         IDispatchPtr edgeDispatch = entity->GetDefinition();
         ksEdgeDefinitionPtr edgeDefinition;
-        hr = edgeDispatch->QueryInterface(__uuidof(ksEdgeDefinition), (void**)&edgeDefinition);
-        if (!edgeDefinition && FAILED(hr))
-        {
-            pKompas_5->ksMessage(_T("Ошибка преобразования к ksEdgeDefinition"));
-            return;
-        }
+        edgeDispatch->QueryInterface(__uuidof(ksEdgeDefinition), (void**)&edgeDefinition);
 
         if (edgeDefinition->IsStraight())
         {
-            IDispatchPtr curveDispatch = edgeDefinition->GetCurve3D();
-            ksCurve3DPtr curve3D;
-            hr = curveDispatch->QueryInterface(__uuidof(ksCurve3D), (void**)&curve3D);
-            if (!curve3D && FAILED(hr))
+            ksEntityPtr iEntityOwner = edgeDefinition->GetOwnerEntity();
+            BSTR entity_name = iEntityOwner->name;
+            wstring entity_name_w(entity_name, SysStringLen(entity_name));
+
+            auto it = find(macro_objects_names.begin(),
+                macro_objects_names.end(), entity_name_w);
+            
+            if (it != macro_objects_names.end())
             {
-                pKompas_5->ksMessage(_T("Ошибка преобразования к Curve3D"));
-                return;
+                IDispatchPtr curveDispatch = edgeDefinition->GetCurve3D();
+                ksCurve3DPtr curve3D;
+                curveDispatch->QueryInterface(__uuidof(ksCurve3D), (void**)&curve3D);
+                double x1, y1, z1, x2, y2, z2;
+
+                ksLineSeg3dParamPtr iLineSeg = curve3D->GetCurveParam();
+                iLineSeg->GetPointFirst(&x1, &y1, &z1);
+                iLineSeg->GetPointLast(&x2, &y2, &z2);
+
+                x1 = roundToThreeDecimalPlaces(x1);
+                y1 = roundToThreeDecimalPlaces(y1);
+                z1 = roundToThreeDecimalPlaces(z1);
+                x2 = roundToThreeDecimalPlaces(x2);
+                y2 = roundToThreeDecimalPlaces(y2);
+                z2 = roundToThreeDecimalPlaces(z2);
+
+                lines_coords.push_back({ x1, y1, z1, x2, y2, z2 });
             }
-            double x1, y1, z1, x2, y2, z2;
-
-            ksLineSeg3dParamPtr iLineSeg = curve3D->GetCurveParam();
-            iLineSeg->GetPointFirst(&x1, &y1, &z1);
-            iLineSeg->GetPointLast(&x2, &y2, &z2);
-
-            x1 = roundToThreeDecimalPlaces(x1);
-            y1 = roundToThreeDecimalPlaces(y1);
-            z1 = roundToThreeDecimalPlaces(z1);
-            x2 = roundToThreeDecimalPlaces(x2);
-            y2 = roundToThreeDecimalPlaces(y2);
-            z2 = roundToThreeDecimalPlaces(z2);
- 
-            lines_coords.push_back({ x1, y1, z1, x2, y2, z2 });
         }
     }
 }
