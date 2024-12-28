@@ -164,7 +164,7 @@ double roundToTwoDecimalPlaces(double value) {
 	return round(value * 10.0) / 10.0;
 }
 
-void CreateBendTable(vector <array<double, 3>> pipelineTrajectory, IKompasDocumentPtr doc)
+void CreateBendTable(vector <array<double, 8>> pipelineTrajectory, IKompasDocumentPtr doc)
 {
 	IKompasDocument2DPtr doc2D(doc);
 	IKompasDocument2D1Ptr doc2D1(doc2D);
@@ -192,18 +192,18 @@ void CreateBendTable(vector <array<double, 3>> pipelineTrajectory, IKompasDocume
 	IDrawingTablePtr iDrwTable;
 
 	long rowsCount = pipelineTrajectory.size()+1;
-	long colsCount = 3;
+	long colsCount = 8;
 	long rowHeight = 8;
 	long colWidth = 25;
 
 	iDrwTables->raw_Add(rowsCount, colsCount, rowHeight, colWidth, ksTableTileLayoutEnum::ksTTLNotCreate, &iDrwTable);
 
 
-	iDrwTable->put_X(double( - 3 * colWidth));
+	iDrwTable->put_X(double( - colsCount * colWidth));
 	iDrwTable->Update();
 
 	ITablePtr iTable(iDrwTable);
-	BSTR titles[] = { L"X", L"Y", L"Z" };
+	BSTR titles[] = {L"N", L"X", L"Y", L"Z" , L"BEND RADIUS", L"BEND ANGLE", L"BEND TWIST", L"OFFSET"};
 	//СТРОКИ
 	for (long i = 0; i < rowsCount; ++i)
 	{
@@ -221,7 +221,7 @@ void CreateBendTable(vector <array<double, 3>> pipelineTrajectory, IKompasDocume
 			}
 			else
 			{
-				array<double, 3> coords = pipelineTrajectory[i - 1];
+				array<double, 8> coords = pipelineTrajectory[i - 1];
 				double coord = coords[n];
 
 				// Округление до 1 знака после запятой
@@ -239,7 +239,7 @@ void CreateBendTable(vector <array<double, 3>> pipelineTrajectory, IKompasDocume
 }
 
 
-void CreateBodyDrawing(IBody7Ptr Body7, BSTR pathName, vector <array<double, 3>> pipelineTrajectory)
+void CreateBodyDrawing(IBody7Ptr Body7, BSTR pathName, vector <array<double, 8>> pipelineTrajectory)
 {
 	HRESULT hr;
 	IDocumentsPtr iDocuments;

@@ -190,7 +190,7 @@ int WINAPI CALLBACKPOINT(LPDISPATCH _Entity, LPDISPATCH _RequestInfo)
 	return res;
 }
 
-void startCreatingDrawing(vector <array<double, 3>> pipelineTrajectory)
+void startCreatingDrawing(vector <array<double, 8>> pipelineTrajectory)
 {
 	IKompasDocumentPtr doc;
 	pKompas_7->get_ActiveDocument(&doc);
@@ -218,7 +218,7 @@ void getRequestInfo()
 		if (!isnan(start_point_coordinates[0]))
 		{
 			PipelineSolver solver(start_point_coordinates);
-			vector <array<double, 3>> pipilineTrajectory = solver.getPipelineTrajectory();
+			vector <array<double, 8>> pipilineTrajectory = solver.getPipelineTrajectory();
 			startCreatingDrawing(pipilineTrajectory);
 		}
 		else

@@ -24,5 +24,10 @@ BSTR CStringToBSTR(const CString& cstr)
 }
 
 double roundToThreeDecimalPlaces(double value) {
-	return round(value * 1000.0) / 1000.0;
+	return round(value * 100.0) / 100.0;
+}
+
+int roundToInt(double value)
+{
+	return round(value);
 }

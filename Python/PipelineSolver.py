@@ -8,12 +8,13 @@ from kAPI import KompasAPI
 class PipelineSolver(KompasAPI):
     def __init__(self):
         super().__init__()
-        self.firts_point = self.define_first_point()
-        self.pipeline_dots = [self.firts_point]
+        #self.firts_point = self.define_first_point()
+        #self.pipeline_dots = [self.firts_point]
         self.lines_coords = self.get_lines_coords()
-        self.find_pipeline()
+        print(self.lines_coords)
+        #self.find_pipeline()
 
-        print(self.pipeline_dots)
+        #print(self.pipeline_dots)
 
     def define_first_point(self):
         doc = self.app.ActiveDocument
@@ -35,8 +36,12 @@ class PipelineSolver(KompasAPI):
                 iEntity = iEntityCollection.GetByIndex(i)
                 iEntityDefinition = iEntity.GetDefinition()
                 if iEntityDefinition.IsStraight() is True:
-                    iCurve3D = iEntityDefinition.GetCurve3D()
-                    lines_coords.append(list(iCurve3D.GetGabarit()[1:]))
+                    curve3D = iEntityDefinition.GetCurve3D()
+                    iLineSeg = curve3D.GetCurveParam()
+                    print(iLineSeg.GetFirstPoint())
+                    
+
+
             return lines_coords
         
     def find_pipeline(self):
